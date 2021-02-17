@@ -1,10 +1,11 @@
 package com.jojodu.webservice.springboot.domain.posts;
 
-import lombok.AccessLevel;
+import javax.persistence.Id;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.web.bind.annotation.RestController;
 
 import javax.persistence.*;
 
