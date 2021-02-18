@@ -25,52 +25,39 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.hamcrest.Matchers.is;
 
 @RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-//@WebMvcTest(controllers = HelloController.class)
+//@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@WebMvcTest(controllers = HelloController.class)
 public class HelloControllerTest {
-    @LocalServerPort
-    private int port;
     @Autowired
-    private TestRestTemplate restTemplate;
-    @Autowired
-    private PostsRepository postsRepository;
+    private MockMvc mvc;
 
-    @After
-    public void tearDown() throws Exception{
-        postsRepository.deleteAll();
+    @Test
+    public void hello가_리턴된다() throws Exception{
+        String hello = "hello";
+
+        mvc.perform(get("/hello"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(hello))
+                .andDo(print());
     }
 
     @Test
-    public void Posts_등록한다()throws Exception{
-        //given
-        String title = "title";
-        String content = "content";
-        Posts savePost = Posts.builder()
-                .title(title)
-                .content(content)
-                .author("author")
-                .build();
-        Long updateId = savePost.getId();
-        String convertTitle = "title2";
-        String convertContent = "content2";
-        PostsUpdateRequestDto requestDto = PostsUpdateRequestDto.builder()
-                .title(convertTitle)
-                .content(convertContent)
-                .build();
-        HttpEntity<PostsUpdateRequestDto> requestEntity = new HttpEntity<>(requestDto);
-        String url = "http://localhost:"+port+"/api/v1/posts"+updateId;
-        //when
-        ResponseEntity<Long> responseEntity = restTemplate.postForEntity(url, requestDto, Long.class);
-        //then
-        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(responseEntity.getBody()).isGreaterThan(0L);
+    public void helloDto가_리턴된다() throws Exception{
+        String name = "이현종";
+        int amount = 1000;
 
-        List<Posts> all = postsRepository.findAll();
-        assertThat(all.get(0).getTitle()).isEqualTo(convertTitle);
-        assertThat(all.get(0).getContent()).isEqualTo(convertContent);
+        mvc.perform(get("/hello/dto")
+        .param("name",name)
+        .param("amount",String.valueOf(amount)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name",is(name)))
+                .andExpect(jsonPath("$.amount",is(amount)))
+                .andDo(print());
+
     }
 }
