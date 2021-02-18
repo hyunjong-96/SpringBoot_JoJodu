@@ -246,7 +246,7 @@ spring.jpa.properties.hibernate.dialect.storage_engine=innodb
 spring.datasource.hikari.jdbc-url=jdbc:h2:mem://localhost/~/testdb;MODE=MYSQL
 ```
 
-## [1]PostsRepositoryTest
+## [1]PostsRepositoryTest(repository테스트)
 
 MockMvc를 사용하지않고 @Service나 @Repository를 사용하는 테스는 서블릿 컨테이너를 구동 후 테스트를 해야함으로 **@SpringBootTest어노테이션에 webEnvironment값을 변경**해주어야한다. 그리고 MockMvc객체를 통해서가아닌 TestRestTemplate객체 같은 다른 방식으로 테스트를 해야한다. 이러한 테스트를 **서블릿 컨테이너 테스트**라고 한다.
 
@@ -311,3 +311,130 @@ public class PostsRepositoryTest{
 7. isEqualTo
    * assertj의 동등 비교 메소드
    * assertThat에 있는 ㄱ밧과 isEqualTo의 값을 비교해서 같을 때만 성공
+
+## [2]PostsRepositoryTest(post저장 로직 테스트 with requestDto)
+
+```java
+@RunWith(SpringRunner.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+public class PostsRepositoryTest{
+    @LocalServerPort
+    private int port;
+    @Autowired
+    private TestRestTemplate restTemplate; //1
+    @Autowired
+    private PostsRepository postsRepository;
+    @After
+    public void tearDown() throws Exception{
+        postsRepository.deleteAll();
+    }
+    
+    @Test
+    public void Posts_등록된다(){
+        //given
+        String title = "test_tite";
+        String content = "test_content";
+        PostsSaveDto postsSaveDto = PostsSaveDto.build()
+            .title(title)
+            .content(content)
+            .author("이현종")
+            .build();
+        String url = "http://localhost:"+port+"/api/v1/posts";
+        
+        //when
+        ResponseEntity<Long> responseEntity = restTemplate.postForEntity(url,postsSaveRequestDto,Long.class); //2
+        List<Posts> all = postsRepository.findAll();
+        
+        //then
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(responseEntity.getBody()).isGreaterThan(0L); //3
+        
+        assertThat(all.get(0).getTitle()).isEqualTo(title);
+        assertThat(all.get(0).getContent()).isEqualTo(content);
+    }
+}
+```
+
+1. TestRestTemplate
+   * 서블릿 컨테이너 테스트할떄 사용하는 스프링에서 제공하는 템플릿(Servlet Container를 사용.)
+   * http통신에 유용하게 쓸 수 있는 템플릿이며, http서버와의 통신을 단순화하고 RESTfull원칙을 지킨다.
+   * SpringBootTest에서 WebEnviroment설정을 해주면 TestRestTemplate에서 그에 맞춰서 자동으로 설정되어 Bean이 생성된다.
+   * 동작원리
+     ![image](https://user-images.githubusercontent.com/57162257/108361580-06a1ce80-7236-11eb-879c-808f560db39f.png)
+     1. 어플리케이션이 **RestTemplate**를 생성하고 URI,HTTP메소드 등의 헤더를 담아 요청.
+     2. RestTemplate는 **HttpMessageConverter**를 사용하여 **requestEntity**를 **요청메세지(JSON)**로 변환.
+     3. RestTemplate는 **ClientHttpRequestFactory**로 부터 **ClientHttpRequest**를 가져와서 요청을 보낸다.
+     4. ClientHttpRequest는 요청메세지를 만들어 HTTP프로토콜을 통해 서버와 통신.
+     5. RestTemplate는 **ResponseErrorHandler**로 오류를 확인하고 있다면 처리로직을 태운다.
+     6. ResponseErrorHandler는 오류가 있다면 **ClientHttpResponse**에서 응답데이터를 가져와서 처리한다.
+     7. RestTemplate는 **HttpMessageConverter**를 이용해서 응답메세지를 **java object(Class responseType)**로 변환한다.
+     8. 어플리케이션에 반환된다.
+2. restTemplate.postsForEntity(url,Object request, Class< T >responseType)
+   * 첫번쨰 파라미터 : url, 두번쨰 파라미터 : 요청할 object, 세번쨰 파라미터 : 반환받을 타입형
+   * postsForEntity를 사용해서 post메소드로 요청을 보냄.
+3. assertThat().isGreaterThan
+   * 반환받은 body에 값이 있는지 없는지 확인.
+
+
+
+## [3]PostsRepository(불러오기,수정하기)
+
+```java
+@Test
+public void Posts_수정하기()throws Exception{
+    //given
+    Posts savePosts = Posts.builder()
+        .title("title")
+        .content("content")
+        .author("이현종")
+        .build();
+    Long getId = savePosts.getId();
+    String convertTitle = "title2";
+    String convertContent = "content2";
+    String url = "http://localhost:"+port+"/api/v1/posts"+getId;
+    PostsUpdateRequestDto updateRequestDto = PostsUpdateRequestDto.builder()
+                .title(convertTitle)
+                .content(convertContent)
+                .build();
+    
+    //when
+    HttpEntity<PostsUpdateRequestDto> requestEntity = new HttpEntity<>(updateRequestDto); //1
+    ResponseEntity<Long> responseEntity = restTemplate.exchange(url,HttpMethod.PUT,requestEntity,Long.class); //2
+    
+    //then
+    assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(responseEntity.getBody()).isGreaterThan(0L);
+    List<Posts> all = postsRepository.findAll();
+    assertThat(all.get(0).getTitle()).isEqualTo(convertTitle);
+    assertThat(all.get(0).getContent()).isEqualTo(convertContent);
+}
+```
+
+1. HttpEntity
+
+   * 스프링에서 제공하는 HttpEntity클래스
+
+   * Http프로토콜을 이용하는 통신의 header와 body관련 정보를 저장할 수 있도록한다.
+
+   * 이를 상속받는 클래스로 RequestEntity와 ResponseEntity가 있다.
+
+   * 즉, 통신 메시지 관련 header와 body값들을 하나의 객체로 저장하는 것이 HttpEntity클래스 객체
+
+   * Request부분일 경우 HttpEntity를 상속받은 RequestEntity
+
+   * Response부분일 경우 HttpEntity를 상속받는 ResponseEntity가 하게된다.
+
+   * HttpEntity
+
+     ![image](https://user-images.githubusercontent.com/57162257/108367091-6d29eb00-723c-11eb-9010-0e05a6ac2d70.png)
+
+   * RequestEntity
+     ![image](https://user-images.githubusercontent.com/57162257/108367282-a2ced400-723c-11eb-8f96-9709b902afd0.png)
+
+   * ResponseEntity
+
+     ![image](https://user-images.githubusercontent.com/57162257/108367361-bb3eee80-723c-11eb-95a5-97f18e89a481.png)
+
+2. restTemplate.exchange(url, HttpMethod, HttpEntity< T > requestEntity, Class< T > responseType)
+
+   * 첫번쨰 파라미터 : url, 두번쨰 파라미터 : HttpEntity타입인 요청Entity, 세번쨰 파라미터 : 반환객체Type

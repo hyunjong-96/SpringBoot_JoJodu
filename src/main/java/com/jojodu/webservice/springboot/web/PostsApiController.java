@@ -17,10 +17,12 @@ public class PostsApiController {
     public Long save(@RequestBody PostsSaveRequestDto requestDto){
         return postsService.save(requestDto);
     }
+
     @GetMapping("/{id}")
     public PostsResponseDto findById(@PathVariable(name = "id") Long id){
         return postsService.findById(id);
     }
+
     @PutMapping("/{id}")
     public Long update(@PathVariable(name = "id") Long id, @RequestBody PostsUpdateRequestDto postsUpdateRequestDto){
         return postsService.update(id,postsUpdateRequestDto);

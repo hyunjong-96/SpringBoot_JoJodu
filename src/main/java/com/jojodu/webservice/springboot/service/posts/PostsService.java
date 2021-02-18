@@ -20,6 +20,7 @@ public class PostsService {
     public Long save(PostsSaveRequestDto requestDto){
         return postsRepository.save(requestDto.toEntity()).getId();
     }
+
     @Transactional
     public PostsResponseDto findById(final Long id){
         Optional<Posts> findPost = postsRepository.findById(id);
